@@ -1,0 +1,145 @@
+# ==========================================================
+# 1. Import Libraries
+# ==========================================================
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+
+# ==========================================================
+# 2. Load Dataset
+# ==========================================================
+df = pd.read_csv("traffic_accidents.csv")
+
+print("\n----- First 5 rows -----")
+print(df.head())
+
+print("\n----- Dataset Info -----")
+print(df.info())
+
+print("\n----- Missing Values -----")
+print(df.isnull().sum())
+
+# ==========================================================
+# 3. Exploratory Data Analysis (EDA)
+# ==========================================================
+
+# Summary statistics
+print("\n----- Summary Stats -----")
+print(df.describe())
+
+# Plot distribution of target column
+target_column = "Severity"     # Example target
+sns.countplot(data=df, x=target_column)
+plt.title("Target Class Distribution")
+plt.show()
+
+# Correlation heatmap (only numeric columns)
+plt.figure(figsize=(10,7))
+sns.heatmap(df.corr(), annot=True, cmap="coolwarm")
+plt.title("Correlation Heatmap")
+plt.show()
+
+# ==========================================================
+# 4. Preprocessing
+# ==========================================================
+
+# --- Encode categorical features ---
+categorical_cols = df.select_dtypes(include=['object']).columns
+
+label_encoders = {}
+for col in categorical_cols:
+    le = LabelEncoder()
+    df[col] = le.fit_transform(df[col])
+    label_encoders[col] = le
+
+# --- Select features and target ---
+X = df.drop(target_column, axis=1)
+y = df[target_column]
+
+# --- Train-test split ---
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+# --- Feature scaling ---
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+
+# ==========================================================
+# 5. Build SIMPLE ANN Model
+# ==========================================================
+
+model = Sequential([
+    Dense(32, activation='relu', input_shape=(X_train.shape[1],)),
+    Dense(16, activation='relu'),
+    Dense(8, activation='relu'),
+    Dense(1, activation='sigmoid')   # Use softmax if >2 classes
+])
+
+model.compile(
+    optimizer='adam',
+    loss='binary_crossentropy',      # Use sparse_categorical_crossentropy if >2 classes
+    metrics=['accuracy']
+)
+
+print(model.summary())
+
+# ==========================================================
+# 6. Train Model
+# ==========================================================
+
+history = model.fit(
+    X_train,
+    y_train,
+    epochs=50,
+    batch_size=32,
+    validation_split=0.2
+)
+
+# ==========================================================
+# 7. Plot Training Results
+# ==========================================================
+plt.figure(figsize=(10,4))
+
+plt.subplot(1,2,1)
+plt.plot(history.history['loss'], label='Train Loss')
+plt.plot(history.history['val_loss'], label='Val Loss')
+plt.legend()
+plt.title("Loss Curve")
+
+plt.subplot(1,2,2)
+plt.plot(history.history['accuracy'], label='Train Acc')
+plt.plot(history.history['val_accuracy'], label='Val Acc')
+plt.legend()
+plt.title("Accuracy Curve")
+
+plt.show()
+
+# ==========================================================
+# 8. Evaluate Model
+# ==========================================================
+loss, accuracy = model.evaluate(X_test, y_test)
+print(f"\nTest Accuracy: {accuracy:.4f}")
+
+# ==========================================================
+# 9. Make Predictions
+# ==========================================================
+pred = model.predict(X_test[:10])
+print("\nRaw Predictions:")
+print(pred)
+
+pred_classes = (pred > 0.5).astype(int)
+print("\nPredicted Classes:")
+print(pred_classes)
+
+print("\nActual Classes:")
+print(np.array(y_test[:10]))
